@@ -58,6 +58,14 @@ export default function Page() {
     // 不再修改 window.location / history
   };
 
+  // 新增：清空輸入與結果與狀態
+  const handleClear = () => {
+    setInput("");
+    setSanitized("");
+    setCopyStatus("");
+    setShareStatus("");
+  };
+
   // 新增：複製文字到剪貼簿（先用 navigator.clipboard，失敗時用 fallback）
   const handleCopy = async () => {
     if (!sanitized) return;
@@ -133,17 +141,31 @@ export default function Page() {
         包含換行：{hasNewline ? "是" : "否"}
       </div>
 
+      {/* 套用 / 清空 按鈕列 */}
       <div style={{ marginTop: 12 }}>
-        <button
-          onClick={handleApply}
-          style={{
-            padding: "8px 16px",
-            fontSize: 16,
-            cursor: "pointer",
-          }}
-        >
-          套用
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={handleApply}
+            style={{
+              padding: "8px 16px",
+              fontSize: 16,
+              cursor: "pointer",
+            }}
+          >
+            套用
+          </button>
+
+          <button
+            onClick={handleClear}
+            style={{
+              padding: "8px 16px",
+              fontSize: 16,
+              cursor: "pointer",
+            }}
+          >
+            清空
+          </button>
+        </div>
       </div>
 
       {sanitized !== "" && (

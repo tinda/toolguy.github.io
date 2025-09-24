@@ -7,6 +7,8 @@ export default function Page() {
   const [sanitized, setSanitized] = useState<string>("");
   // 新增：複製狀態顯示
   const [copyStatus, setCopyStatus] = useState<string>("");
+  // 新增：每段複製狀態
+  const [copyStatusMap, setCopyStatusMap] = useState<Record<number, string>>({});
   // 新增：分享狀態顯示
   const [shareStatus, setShareStatus] = useState<string>("");
 
@@ -17,11 +19,11 @@ export default function Page() {
       ""
     );
 
-  // 處理按鈕按下：移除 emoji，並在字串內的每個 URL 加入或覆寫 cid=14626
+  // 處理按鈕按下：移除 emoji，並在字串內的每個 URL 加入或覆寫 cid=14626（針對 kkday/klook 做不同處理）
   const handleApply = () => {
     const cleaned = removeEmoji(input);
 
-    // 找到 http/https URL，並對每個 URL 用 URL 解析後設定 cid=14626
+    // 找到 http/https URL，並對每個 URL 用 URL 解析後設定對應參數
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const result = cleaned.replace(urlRegex, (match) => {
       // 有時候 match 會帶上結尾的標點，例如 "http://a.com,"，把常見的標點暫時剝離再還原
@@ -31,7 +33,18 @@ export default function Page() {
 
       try {
         const u = new URL(core);
-        u.searchParams.set("cid", "14626");
+        const host = u.hostname.toLowerCase();
+
+        // 針對 kkday 設 cid=14626；針對 klook 設 aid=15649；其他 host 則不修改查詢參數
+        if (host.includes("kkday")) {
+          u.searchParams.set("cid", "14626");
+        } else if (host.includes("klook")) {
+          u.searchParams.set("aid", "15649");
+        } else {
+          // 若希望對其他網站也加上 cid，可取消下一行註解：
+          // u.searchParams.set("cid", "14626");
+        }
+
         return u.toString() + trailing;
       } catch (e) {
         // 解析失敗就回傳原始 match
@@ -66,16 +79,14 @@ export default function Page() {
     setShareStatus("");
   };
 
-  // 新增：複製文字到剪貼簿（先用 navigator.clipboard，失敗時用 fallback）
-  const handleCopy = async () => {
-    if (!sanitized) return;
+  // 新增：複製到剪貼簿的共用函式
+  const copyToClipboard = async (text: string) => {
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(sanitized);
+        await navigator.clipboard.writeText(text);
       } else {
-        // fallback for older browsers / environments
         const textarea = document.createElement("textarea");
-        textarea.value = sanitized;
+        textarea.value = text;
         textarea.style.position = "fixed";
         textarea.style.left = "-9999px";
         document.body.appendChild(textarea);
@@ -84,12 +95,48 @@ export default function Page() {
         document.execCommand("copy");
         document.body.removeChild(textarea);
       }
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  // 修改：複製整段（保留舊功能）
+  const handleCopy = async () => {
+    if (!sanitized) return;
+    const ok = await copyToClipboard(sanitized);
+    if (ok) {
       setCopyStatus("已複製");
       setTimeout(() => setCopyStatus(""), 2000);
-    } catch (e) {
+    } else {
       setCopyStatus("複製失敗");
       setTimeout(() => setCopyStatus(""), 2000);
     }
+  };
+
+  // 新增：複製指定段落（index）
+  const handleCopyChunk = async (index: number, text: string) => {
+    if (!text) return;
+    const ok = await copyToClipboard(text);
+    setCopyStatusMap((prev) => ({ ...prev, [index]: ok ? "已複製" : "複製失敗" }));
+    setTimeout(() => {
+      setCopyStatusMap((prev) => {
+        const next = { ...prev };
+        delete next[index];
+        return next;
+      });
+    }, 2000);
+  };
+
+  // 新增：把字串切成每段最多 n 字（不斷行處理保留換行）
+  const splitIntoChunks = (text: string, size = 450) => {
+    const chunks: string[] = [];
+    let start = 0;
+    while (start < text.length) {
+      chunks.push(text.slice(start, start + size));
+      start += size;
+    }
+    return chunks;
   };
 
   // 新增：分享（優先使用 Web Share API，否則開啟外部分享連結作為 fallback）
@@ -171,8 +218,36 @@ export default function Page() {
       {sanitized !== "" && (
         <div style={{ marginTop: 16 }}>
           <strong>過濾結果：</strong>
-          {/* pre-wrap 可保留換行顯示 */}
-          <div style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>{sanitized}</div>
+          {/* pre-wrap 可保留換行顯示；若超過 450 字，切成多段並分別顯示與複製 */}
+          <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 12 }}>
+            {splitIntoChunks(sanitized, 450).map((chunk, idx) => (
+              <div
+                key={idx}
+                style={{
+                  border: "1px solid #eee",
+                  padding: 12,
+                  borderRadius: 6,
+                  background: "#fafafa",
+                }}
+              >
+                <div style={{ whiteSpace: "pre-wrap", fontSize: 14 }}>{chunk}</div>
+                <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}>
+                  <button
+                    onClick={() => handleCopyChunk(idx, chunk)}
+                    style={{
+                      padding: "6px 10px",
+                      fontSize: 13,
+                      cursor: "pointer",
+                      minWidth: 72,
+                    }}
+                  >
+                    複製段落
+                  </button>
+                  {copyStatusMap[idx] && <span style={{ fontSize: 13 }}>{copyStatusMap[idx]}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
 
           <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
             <button
@@ -184,7 +259,7 @@ export default function Page() {
                 minWidth: 80,
               }}
             >
-              複製
+              複製全部
             </button>
 
             {/* 新增：分享按鈕（手機會觸發原生分享） */}

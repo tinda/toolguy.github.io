@@ -40,6 +40,15 @@ export default function Page() {
           u.searchParams.set("cid", "14626");
         } else if (host.includes("klook")) {
           u.searchParams.set("aid", "15649");
+        } else if (host.includes("liontravel")) {
+          u.searchParams.set("mtld", "00002337");
+          u.searchParams.set("mtl", "lionaff");
+          u.searchParams.set("utm_source", "lionaffiliate");
+          u.searchParams.set("utm_medium", "cpa");
+        } else if (host.includes("trip.com")) {
+          u.searchParams.set("sid", "261955863");
+          u.searchParams.set("Allianceid", "7120891");
+          u.searchParams.set("aid", "7120891");
         } else {
           // 若希望對其他網站也加上 cid，可取消下一行註解：
           // u.searchParams.set("cid", "14626");
